@@ -5,8 +5,18 @@ from datetime import date
 
 def render_register():
     today = date.today()
-    year = today.year
-    month = today.month
+
+    if "cal_year" not in st.session_state:
+        st.session_state.cal_year = today.year
+    if "cal_month" not in st.session_state:
+        st.session_state.cal_month = today.month
+
+    year = st.session_state.cal_year
+    month = st.session_state.cal_month
+    if "selected_dates" in st.session_state:
+     st.session_state.selected_dates = [
+        d for d in st.session_state.selected_dates if d >= today
+    ]
 
     if "selected_dates" not in st.session_state:
         st.session_state.selected_dates = []
@@ -26,6 +36,8 @@ def render_register():
         st.session_state.tags_widget_key = 0
 
     def toggle_date(d):
+        if d < today:
+            return
         if d in st.session_state.selected_dates:
             st.session_state.selected_dates.remove(d)
         else:
@@ -46,12 +58,33 @@ def render_register():
     def delete_attendance(index):
         del st.session_state.attendance_list[index]
 
-    st.title("出社登録")
-
     with st.container(border=True):
-        st.subheader("📅 出社日を選ぶ")
-        st.markdown(f"### {year}年 {month}月")
-        st.caption("複数日選択可")
+        st.subheader("出社日を選ぶ")
+
+        col_prev, col_title, col_next = st.columns([1, 4, 1])
+
+        with col_prev:
+            if st.button("＜"):
+                if (st.session_state.cal_year, st.session_state.cal_month) > (today.year, today.month):
+                    if st.session_state.cal_month == 1:
+                        st.session_state.cal_year -= 1
+                        st.session_state.cal_month = 12
+                    else:
+                        st.session_state.cal_month -= 1
+                    st.rerun()
+
+        with col_title:
+            st.markdown(f"<h3 style='text-align:center'>{year}年 {month}月</h3>", unsafe_allow_html=True)
+            st.caption("複数日選択可")
+
+        with col_next:
+            if st.button("＞"):
+                if st.session_state.cal_month == 12:
+                    st.session_state.cal_year += 1
+                    st.session_state.cal_month = 1
+                else:
+                    st.session_state.cal_month += 1
+                st.rerun()
 
         weekdays = ["日", "月", "火", "水", "木", "金", "土"]
         cols = st.columns(7)
@@ -72,11 +105,13 @@ def render_register():
 
                 with cols[i]:
                     if in_month:
+                        is_past = d < today 
                         if st.button(
                             str(d.day),
                             key=f"day_{d}",
                             use_container_width=True,
-                            type="primary" if selected else "secondary"
+                            type="primary" if selected else "secondary",
+                            disabled=is_past
                         ):
                             toggle_date(d)
                             st.rerun()
@@ -94,13 +129,13 @@ def render_register():
 
         st.divider()
 
-        st.subheader("⏰ 時間帯・目的タグを設定")
+        st.subheader("時刻・目的タグを設定")
 
         col1, col2 = st.columns(2)
 
         with col1:
             start_time = st.selectbox(
-                "開始時間",
+                "開始時刻",
                 time_options,
                 key="start_time"
             )
@@ -113,14 +148,14 @@ def render_register():
 
         with col2:
             end_time = st.selectbox(
-                "終了時間",
+                "終了時刻",
                 end_options,
                 key="end_time"
             )
 
         tags = st.pills(
             "目的タグ",
-            ["📦 ランチ可能", "💬 雑談歓迎", "🎯 作業メイン", "☕ コーヒー休憩"],
+            ["🍱 ランチ可能", "💬 雑談歓迎", "🎯 作業メイン", "☕ コーヒー休憩"],
             selection_mode="multi",
             key=f"tags_{st.session_state.tags_widget_key}"
         )
